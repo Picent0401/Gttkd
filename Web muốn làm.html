@@ -231,35 +231,143 @@
             dirLight.castShadow = true;
             scene.add(dirLight);
 
-            // Chế tạo Drone (Bản thu gọn code cũ)
+            // 3. Chế tạo VDR-1
             const drone = new THREE.Group();
             scene.add(drone);
 
+            // Vật liệu
             const darkMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3 }); 
             const silverMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5 }); 
             const yellowMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, roughness: 0.2 }); 
+            const lensMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 }); 
 
-            // Thân, Hộp hàng, Khung
-            drone.add(new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.6, 6), darkMat));
+            // --- THÂN CHÍNH ---
+            const bodyGeo = new THREE.CylinderGeometry(1.4, 1.4, 0.6, 6);
+            const body = new THREE.Mesh(bodyGeo, darkMat);
+            body.castShadow = true;
+            drone.add(body);
+
+            // --- CẢM BIẾN & RADAR ---
+            // Cục Radar Lidar trên nóc
+            const radarGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.25, 16);
+            const radar = new THREE.Mesh(radarGeo, silverMat);
+            radar.position.y = 0.4;
+            radar.castShadow = true;
+            drone.add(radar);
+
+            // Camera phía trước
+            const camGroup = new THREE.Group();
+            const camBodyGeo = new THREE.BoxGeometry(0.5, 0.3, 0.4);
+            const camBody = new THREE.Mesh(camBodyGeo, darkMat);
+            camGroup.add(camBody);
             
-            const payload = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.0, 1.5), yellowMat);
-            payload.position.y = -0.9; drone.add(payload);
+            const lensGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.1, 16);
+            const lens = new THREE.Mesh(lensGeo, lensMat);
+            lens.rotation.x = Math.PI / 2;
+            lens.position.set(0, 0, 0.21);
+            camGroup.add(lens);
 
+            camGroup.position.set(0, 0, 1.45);
+            camGroup.castShadow = true;
+            drone.add(camGroup);
+
+            // --- CÁNH TAY & ĐỘNG CƠ ---
             const propellers = [];
+            const radius = 3; 
+
             for(let i = 0; i < 6; i++) {
                 const angle = (i / 6) * Math.PI * 2;
-                const x = Math.cos(angle) * 3; const z = Math.sin(angle) * 3;
-                
-                const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3), silverMat);
-                arm.position.set(x/2, 0, z/2); arm.rotation.y = -angle; arm.rotation.z = Math.PI/2;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+
+                const armGeo = new THREE.CylinderGeometry(0.12, 0.12, radius);
+                const arm = new THREE.Mesh(armGeo, silverMat);
+                arm.position.set(x/2, 0, z/2);
+                arm.rotation.y = -angle;
+                arm.rotation.z = Math.PI / 2;
+                arm.castShadow = true;
                 drone.add(arm);
-                
-                const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.5), darkMat);
-                motor.position.set(x, 0.25, z); drone.add(motor);
-                
-                const prop = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.05, 0.15), darkMat);
-                prop.position.set(x, 0.55, z); drone.add(prop); propellers.push(prop);
+
+                const motorGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.5);
+                const motor = new THREE.Mesh(motorGeo, darkMat);
+                motor.position.set(x, 0.25, z);
+                motor.castShadow = true;
+                drone.add(motor);
+
+                const propGeo = new THREE.BoxGeometry(2.4, 0.05, 0.15);
+                const prop = new THREE.Mesh(propGeo, darkMat);
+                prop.position.set(x, 0.55, z);
+                prop.castShadow = true;
+                drone.add(prop);
+                propellers.push(prop);
             }
+
+            // --- KHUNG GẦM (LANDING GEAR) ---
+            // Thanh trượt ngang
+            const skidGeo = new THREE.CylinderGeometry(0.08, 0.08, 4);
+            const skid1 = new THREE.Mesh(skidGeo, darkMat);
+            skid1.rotation.x = Math.PI / 2;
+            skid1.position.set(1.1, -1.8, 0);
+            skid1.castShadow = true;
+            drone.add(skid1);
+
+            const skid2 = new THREE.Mesh(skidGeo, darkMat);
+            skid2.rotation.x = Math.PI / 2;
+            skid2.position.set(-1.1, -1.8, 0);
+            skid2.castShadow = true;
+            drone.add(skid2);
+
+            // Chân nối xiên
+            const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 2.0);
+            const addLeg = (x, z, rotZ, rotX) => {
+                const leg = new THREE.Mesh(legGeo, silverMat);
+                leg.position.set(x, -0.9, z);
+                leg.rotation.z = rotZ;
+                leg.rotation.x = rotX;
+                leg.castShadow = true;
+                drone.add(leg);
+            };
+            addLeg(0.9, 1.2, -0.2, 0);
+            addLeg(0.9, -1.2, -0.2, 0);
+            addLeg(-0.9, 1.2, 0.2, 0);
+            addLeg(-0.9, -1.2, 0.2, 0);
+
+            // --- HỘP HÀNG & TAY KẸP (PAYLOAD & GRIPPERS) ---
+            // Hộp hàng
+            const boxGeo = new THREE.BoxGeometry(1.5, 1.0, 1.5);
+            const payload = new THREE.Mesh(boxGeo, yellowMat);
+            payload.position.y = -0.9;
+            payload.castShadow = true;
+            drone.add(payload);
+
+            // Trục nối chính
+            const mountGeo = new THREE.BoxGeometry(0.8, 0.4, 0.8);
+            const mount = new THREE.Mesh(mountGeo, darkMat);
+            mount.position.y = -0.4;
+            drone.add(mount);
+
+            // 4 Tay kẹp hai bên hông hộp hàng
+            const gripGeo = new THREE.BoxGeometry(0.1, 1.0, 0.2);
+            const addGripper = (x, z) => {
+                const grip = new THREE.Mesh(gripGeo, darkMat);
+                grip.position.set(x, -0.9, z);
+                grip.castShadow = true;
+                drone.add(grip);
+            };
+            addGripper(0.76, 0.6);
+            addGripper(0.76, -0.6);
+            addGripper(-0.76, 0.6);
+            addGripper(-0.76, -0.6);
+
+            // Thanh đỡ đáy hộp
+            const bottomSupportGeo = new THREE.BoxGeometry(1.6, 0.1, 0.2);
+            const bottomSupport1 = new THREE.Mesh(bottomSupportGeo, darkMat);
+            bottomSupport1.position.set(0, -1.45, 0.6);
+            drone.add(bottomSupport1);
+            
+            const bottomSupport2 = new THREE.Mesh(bottomSupportGeo, darkMat);
+            bottomSupport2.position.set(0, -1.45, -0.6);
+            drone.add(bottomSupport2);
 
             // Xử lý Tương tác 
             let isRunning = false; let currentSpeed = 0.5; let hoverTime = 0;
